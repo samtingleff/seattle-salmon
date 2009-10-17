@@ -3,11 +3,11 @@
 import os
 import sys
 import struct
+import daemon
 
 sys.path.append("..")
 sys.path.append(os.path.join(sys.path[0], '..'))
 
-import daemon
 from storage.bdb import BTree
 
 from twisted.internet import reactor, protocol, defer, task
