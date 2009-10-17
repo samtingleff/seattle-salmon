@@ -3,64 +3,44 @@
 import os
 import sys
 import struct
-try:
-    from bsddb3 import db
-except ImportError:
-    from bsddb import db
 
 sys.path.append("..")
 sys.path.append(os.path.join(sys.path[0], '..'))
+
+import daemon
+from storage.bdb import BTree
 
 from twisted.internet import reactor, protocol, defer, task
 
 from memcache import binary, constants
 
-class BTreeStorage(object):
-    default_flags, default_expires, default_cas = 0, 0, 0
-    def __init__(self):
-        self.dbm = db.DB()
-        self.dbm.open("testfile.db", None, dbtype=db.DB_BTREE, flags=db.DB_CREATE)
-
-    def doGet(self, req, data):
-        try:
-            val = self.dbm.get(req.key)
-            if val:
-                return binary.GetResponse(req, self.default_flags, self.default_cas, data=val)
-            else: raise binary.MemcachedNotFound()
-        except KeyError:
-            raise binary.MemcachedNotFound()
-
-    def doSet(self, req, data):
-        flags, exp = struct.unpack(constants.SET_PKT_FMT, req.extra)
-        self.dbm.put(req.key, data)
-        self.dbm.sync()
-
-    def doDelete(self, req, data):
-        try:
-            self.dbm.delete(req.key)
-            self.dbm.sync()
-        except db.DBNotFoundError:
-            raise binary.MemcachedNotFound()
-
-storage = BTreeStorage()
-
-def ex(*a):
-    print "Shutting down a client."
-    raise binary.MemcachedDisconnect()
-    # this also works, but apparently confuses people.
-    # sys.exit(0)
-
-class ExampleBinaryServer(binary.BinaryServerProtocol):
+class SimpleBinaryServer(binary.BinaryServerProtocol):
+    storage = BTree('/Users/stingleff/src/seattle-salmon/tmp')
 
     handlers = {
         constants.CMD_GET: storage.doGet,
         constants.CMD_SET: storage.doSet,
         constants.CMD_DELETE: storage.doDelete,
-        constants.CMD_QUIT: ex
-        }
+        constants.CMD_QUIT: storage.doQuit
+    }
 
-factory = protocol.Factory()
-factory.protocol = ExampleBinaryServer
+class SeattleSalmon(daemon.Daemon):
+    default_conf = '/etc/seattle-salmon.conf'
+    default_port = 8089
+    section = 'daemon'
 
-reactor.listenTCP(11212, factory)
-reactor.run()
+    def run(self):
+        factory = protocol.Factory()
+        factory.protocol = SimpleBinaryServer
+
+        port = int(self.get_option(self.section, 'port', default=self.default_port))
+        reactor.listenTCP(port, factory)
+        reactor.run()
+
+if __name__ == '__main__':
+    ss = SeattleSalmon()
+    ss.parse_options()
+    #ss.main()
+    ss.read_basic_config()
+    ss.run()
+
