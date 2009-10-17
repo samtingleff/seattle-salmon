@@ -10,13 +10,19 @@ class BTree(object):
     default_flags, default_expires, default_cas = 0, 0, 0
     def __init__(self, homedir):
         self.dbenv = db.DBEnv()
-        self.dbenv.open(homedir, db.DB_CREATE | db.DB_THREAD | db.DB_INIT_LOCK | db.DB_INIT_MPOOL | db.DB_TXN_SYNC)
-        self.dbm = db.DB(dbEnv=self.dbenv)
-        self.dbm.open("testfile.db", None, dbtype=db.DB_BTREE, flags=db.DB_CREATE)
+        self.dbenv.open(homedir, db.DB_INIT_LOCK | db.DB_INIT_LOG | db.DB_INIT_MPOOL | db.DB_INIT_TXN | db.DB_RECOVER | db.DB_USE_ENVIRON | db.DB_USE_ENVIRON_ROOT | db.DB_CREATE | db.DB_REGISTER | db.DB_THREAD)
+        txn = None
+        try:
+            txn = self.dbenv.txn_begin()
+            self.db = db.DB(dbEnv=self.dbenv)
+            self.db.open("testfile.db", None, dbtype=db.DB_BTREE, flags=db.DB_CREATE | db.DB_READ_UNCOMMITTED | db.DB_THREAD, txn=txn)
+            txn.commit()
+        except Exception:
+            txn.abort()
 
     def doGet(self, req, data):
         try:
-            val = self.dbm.get(req.key)
+            val = self.db.get(req.key)
             if val:
                 return binary.GetResponse(req, self.default_flags, self.default_cas, data=val)
             else: raise binary.MemcachedNotFound()
@@ -25,15 +31,29 @@ class BTree(object):
 
     def doSet(self, req, data):
         flags, exp = struct.unpack(constants.SET_PKT_FMT, req.extra)
-        self.dbm.put(req.key, data)
-        self.dbm.sync()
+        txn = None
+        try:
+            txn = self.dbenv.txn_begin()
+            self.db.put(req.key, data, txn=txn)
+            txn.commit()
+        except Exception:
+            txn.abort()
+            raise binary.MemcachedError
 
     def doDelete(self, req, data):
+        txn = None
         try:
-            self.dbm.delete(req.key)
-            self.dbm.sync()
+            txn = self.dbenv.txn_begin()
+            self.db.delete(req.key, txn=txn)
+            self.db.sync()
+            txn.commit()
         except db.DBNotFoundError:
+            txn.abort()
             raise binary.MemcachedNotFound()
+        except Exception:
+            txn.abort()
+            raise binary.MemcachedError
 
     def doQuit(self, *a):
         raise binary.MemcachedDisconnect()
+
