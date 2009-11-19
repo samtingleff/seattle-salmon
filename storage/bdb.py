@@ -11,12 +11,12 @@ class BTree(object):
     def __init__(self, datadir, logdir, cache_gbytes=1, cache_bytes=0):
         self.dbenv = db.DBEnv()
         self.dbenv.set_cachesize(cache_gbytes, cache_bytes)
-        self.dbenv.open(logdir, db.DB_INIT_LOCK | db.DB_INIT_LOG | db.DB_INIT_MPOOL | db.DB_INIT_TXN | db.DB_RECOVER | db.DB_USE_ENVIRON | db.DB_USE_ENVIRON_ROOT | db.DB_CREATE | db.DB_REGISTER | db.DB_THREAD)
+        self.dbenv.open(logdir, db.DB_INIT_LOCK | db.DB_INIT_LOG | db.DB_INIT_MPOOL | db.DB_INIT_TXN | db.DB_RECOVER | db.DB_USE_ENVIRON | db.DB_USE_ENVIRON_ROOT | db.DB_CREATE | db.DB_REGISTER | db.DB_THREAD | db.DB_TXN_NOSYNC)
         txn = None
         try:
             txn = self.dbenv.txn_begin()
             self.db = db.DB(dbEnv=self.dbenv)
-            self.db.open("%s/data-1.db" % datadir, None, dbtype=db.DB_BTREE, flags=db.DB_CREATE | db.DB_READ_UNCOMMITTED | db.DB_THREAD, txn=txn)
+            self.db.open("%s/data-1.db" % datadir, None, dbtype=db.DB_BTREE, flags=db.DB_CREATE | db.DB_READ_UNCOMMITTED | db.DB_THREAD | db.DB_TXN_NOSYNC, txn=txn)
             txn.commit()
         except Exception:
             txn.abort()
@@ -46,7 +46,6 @@ class BTree(object):
         try:
             txn = self.dbenv.txn_begin()
             self.db.delete(req.key, txn=txn)
-            self.db.sync()
             txn.commit()
         except db.DBNotFoundError:
             txn.abort()
