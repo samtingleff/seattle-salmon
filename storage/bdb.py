@@ -11,7 +11,7 @@ class BTree(object):
     def __init__(self, datadir, logdir, cache_gbytes=1, cache_bytes=0):
         self.dbenv = db.DBEnv()
         self.dbenv.set_cachesize(cache_gbytes, cache_bytes)
-        self.dbenv.open(logdir, db.DB_INIT_LOCK | db.DB_INIT_LOG | db.DB_INIT_MPOOL | db.DB_INIT_TXN | db.DB_RECOVER | db.DB_USE_ENVIRON | db.DB_USE_ENVIRON_ROOT | db.DB_CREATE | db.DB_REGISTER | db.DB_THREAD | db.DB_TXN_NOSYNC)
+        self.dbenv.open(logdir, db.DB_INIT_LOCK | db.DB_INIT_LOG | db.DB_INIT_MPOOL | db.DB_INIT_TXN | db.DB_RECOVER | db.DB_USE_ENVIRON | db.DB_USE_ENVIRON_ROOT | db.DB_CREATE | db.DB_REGISTER | db.DB_THREAD | db.DB_READ_COMMITTED | db.DB_TXN_NOWAIT | db.DB_TXN_NOSYNC)
         txn = None
         try:
             txn = self.dbenv.txn_begin()
