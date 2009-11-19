@@ -115,7 +115,7 @@ class SeattleSalmon(daemon.Daemon):
         reactor.listenTCP(port, factory)
 
         repeatingTask = task.LoopingCall(storage.doSync)
-        repeatingTask.start(int(self.get_option('bdb', 'sync-frequency', default='30')))
+        repeatingTask.start(int(self.get_option('bdb', 'sync-frequency', default='60')))
 
         reactor.run()
 
