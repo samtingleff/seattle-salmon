@@ -277,7 +277,7 @@ class Daemon(object):
             self.chown(self.logfile)
         if self.loghost:
             # conditional assignment with python 2.4 compatability
-            logport = (514, int(self.logport))[self.logport]
+            logport = (514, int(self.logport))[self.logport is not None]
             loggers.append(logging.handlers.SysLogHandler((self.loghost, logport)))
         if not self.options.daemonize:
             # also log to stderr
