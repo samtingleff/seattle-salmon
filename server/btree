@@ -27,14 +27,36 @@ class IStorageService(Interface):
 class IStorageFactory(Interface):
     pass
 
+class DummyStorage(object):
+
+    def doGet(self, key, data): pass
+
+    def doSet(self, key, data): pass
+
+    def doDelete(self, key, data): pass
+
+    def doQuit(self, key, data): pass
+
 class SimpleBinaryServer(binary.BinaryServerProtocol):
-    storage = BTree('/Users/stingleff/src/seattle-salmon/tmp')
+    storage = DummyStorage()
+
+    def set_storage(cls, storage_impl):
+        SimpleBinaryServer.storage = storage_impl
+    set_storage = classmethod(set_storage)
+
+    def doGet(req, data): return SimpleBinaryServer.storage.doGet(req, data)
+
+    def doSet(req, data): return SimpleBinaryServer.storage.doSet(req, data)
+
+    def doDelete(req, data): return SimpleBinaryServer.storage.doDelete(req, data)
+
+    def doQuit(*a): return SimpleBinaryServer.storage.doQuit(a)
 
     handlers = {
-        constants.CMD_GET: storage.doGet,
-        constants.CMD_SET: storage.doSet,
-        constants.CMD_DELETE: storage.doDelete,
-        constants.CMD_QUIT: storage.doQuit
+        constants.CMD_GET: doGet,
+        constants.CMD_SET: doSet,
+        constants.CMD_DELETE: doDelete,
+        constants.CMD_QUIT: doQuit
     }
 
 class StorageFactoryFromService(protocol.ServerFactory):
@@ -70,6 +92,9 @@ class SeattleSalmon(daemon.Daemon):
 
     def run(self):
         factory = protocol.Factory()
+        SimpleBinaryServer.set_storage(BTree(
+                self.get_option('bdb', 'data-dir', default='tmp/data'),
+                self.get_option('bdb', 'log-dir', default='tmp/logs')))
         factory.protocol = SimpleBinaryServer
 
         factory = SeattleSalmonFactory()
