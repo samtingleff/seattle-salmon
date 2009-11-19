@@ -10,9 +10,22 @@ sys.path.append(os.path.join(sys.path[0], '..'))
 
 from storage.bdb import BTree
 
+from twisted.application import internet, service
 from twisted.internet import reactor, protocol, defer, task
+from twisted.python import components
+from zope.interface import Interface, implements
 
 from memcache import binary, constants
+
+class IStorageService(Interface):
+    def get(req, data): pass
+
+    def set(req, data): pass
+
+    def delete(req, data): pass
+
+class IStorageFactory(Interface):
+    pass
 
 class SimpleBinaryServer(binary.BinaryServerProtocol):
     storage = BTree('/Users/stingleff/src/seattle-salmon/tmp')
@@ -24,6 +37,32 @@ class SimpleBinaryServer(binary.BinaryServerProtocol):
         constants.CMD_QUIT: storage.doQuit
     }
 
+class StorageFactoryFromService(protocol.ServerFactory):
+    implements(IStorageFactory)
+    protocol = SimpleBinaryServer
+
+    def __init__(self, server):
+        self.service = service
+
+components.registerAdapter(StorageFactoryFromService,
+                           IStorageService,
+                           IStorageFactory)
+
+class StorageService(service.Service):
+    implements(IStorageService)
+
+    def __init__(self):
+        self.d = {}
+
+    def get(self, key, data): return self.d[key]
+
+    def set(self, key, data): self.d[key] = data
+
+    def delete(self, key, data): del self.d[key]
+
+class SeattleSalmonFactory(protocol.Factory):
+    protocol = SimpleBinaryServer
+
 class SeattleSalmon(daemon.Daemon):
     default_conf = '/etc/seattle-salmon.conf'
     default_port = 8089
@@ -33,6 +72,13 @@ class SeattleSalmon(daemon.Daemon):
         factory = protocol.Factory()
         factory.protocol = SimpleBinaryServer
 
+        factory = SeattleSalmonFactory()
+
+        #application = service.Application('ss', uid=1, gid=1)
+        #ss = StorageService()
+        #serviceCollection = service.IServiceCollection(application)
+        #internet.TCPServer(self.default_port, IStorageFactory(ss)).setServiceParent(serviceCollection)
+
         port = int(self.get_option(self.section, 'port', default=self.default_port))
         reactor.listenTCP(port, factory)
         reactor.run()
@@ -40,7 +86,7 @@ class SeattleSalmon(daemon.Daemon):
 if __name__ == '__main__':
     ss = SeattleSalmon()
     ss.parse_options()
-    #ss.main()
-    ss.read_basic_config()
-    ss.run()
+    ss.main()
+    #ss.read_basic_config()
+    #ss.run()
 
