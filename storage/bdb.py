@@ -8,8 +8,9 @@ except ImportError:
 
 class BTree(object):
     default_flags, default_expires, default_cas = 0, 0, 0
-    def __init__(self, datadir, logdir):
+    def __init__(self, datadir, logdir, cache_gbytes=1, cache_bytes=0):
         self.dbenv = db.DBEnv()
+        self.dbenv.set_cachesize(cache_gbytes, cache_bytes)
         self.dbenv.open(logdir, db.DB_INIT_LOCK | db.DB_INIT_LOG | db.DB_INIT_MPOOL | db.DB_INIT_TXN | db.DB_RECOVER | db.DB_USE_ENVIRON | db.DB_USE_ENVIRON_ROOT | db.DB_CREATE | db.DB_REGISTER | db.DB_THREAD)
         txn = None
         try:

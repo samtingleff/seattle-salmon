@@ -94,7 +94,9 @@ class SeattleSalmon(daemon.Daemon):
         factory = protocol.Factory()
         SimpleBinaryServer.set_storage(BTree(
                 self.get_option('bdb', 'data-dir', default='tmp/data'),
-                self.get_option('bdb', 'log-dir', default='tmp/logs')))
+                self.get_option('bdb', 'log-dir', default='tmp/logs'),
+                cache_gbytes=int(self.get_option('bdb', 'cache-gbytes', default='1')),
+                cache_bytes=int(self.get_option('bdb', 'cache-bytes', default='0'))))
         factory.protocol = SimpleBinaryServer
 
         factory = SeattleSalmonFactory()
