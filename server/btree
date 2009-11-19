@@ -37,6 +37,8 @@ class DummyStorage(object):
 
     def doQuit(self, key, data): pass
 
+    def doSync(self): pass
+
 class SimpleBinaryServer(binary.BinaryServerProtocol):
     storage = DummyStorage()
 
@@ -51,6 +53,8 @@ class SimpleBinaryServer(binary.BinaryServerProtocol):
     def doDelete(req, data): return SimpleBinaryServer.storage.doDelete(req, data)
 
     def doQuit(*a): return SimpleBinaryServer.storage.doQuit(a)
+
+    def doSync(): return SimpleBinaryServer.storage.doSync()
 
     handlers = {
         constants.CMD_GET: doGet,
@@ -92,11 +96,12 @@ class SeattleSalmon(daemon.Daemon):
 
     def run(self):
         factory = protocol.Factory()
-        SimpleBinaryServer.set_storage(BTree(
+        storage = BTree(
                 self.get_option('bdb', 'data-dir', default='tmp/data'),
                 self.get_option('bdb', 'log-dir', default='tmp/logs'),
                 cache_gbytes=int(self.get_option('bdb', 'cache-gbytes', default='1')),
-                cache_bytes=int(self.get_option('bdb', 'cache-bytes', default='0'))))
+                cache_bytes=int(self.get_option('bdb', 'cache-bytes', default='0')))
+        SimpleBinaryServer.set_storage(storage)
         factory.protocol = SimpleBinaryServer
 
         factory = SeattleSalmonFactory()
@@ -108,6 +113,10 @@ class SeattleSalmon(daemon.Daemon):
 
         port = int(self.get_option(self.section, 'port', default=self.default_port))
         reactor.listenTCP(port, factory)
+
+        repeatingTask = task.LoopingCall(storage.doSync)
+        repeatingTask.start(int(self.get_option('bdb', 'sync-frequency', default='30')))
+
         reactor.run()
 
 if __name__ == '__main__':

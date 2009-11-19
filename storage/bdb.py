@@ -57,3 +57,9 @@ class BTree(object):
     def doQuit(self, *a):
         raise binary.MemcachedDisconnect()
 
+    def doSync(self):
+        try:
+            self.db.sync()
+        except Exception, e:
+            print e
+
