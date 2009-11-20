@@ -1,4 +1,6 @@
 import struct
+import logging
+import time
 from memcache import binary, constants
 
 try:
@@ -18,7 +20,8 @@ class BTree(object):
             self.db = db.DB(dbEnv=self.dbenv)
             self.db.open("%s/data-1.db" % datadir, None, dbtype=db.DB_BTREE, flags=db.DB_CREATE | db.DB_READ_UNCOMMITTED | db.DB_THREAD | db.DB_TXN_NOSYNC, txn=txn)
             txn.commit()
-        except Exception:
+        except Exception, e:
+            logging.exception(e)
             txn.abort()
 
     def doGet(self, req, data):
@@ -38,6 +41,7 @@ class BTree(object):
             self.db.put(req.key, data, txn=txn)
             txn.commit()
         except Exception:
+            logging.exception(e)
             txn.abort()
             raise binary.MemcachedError
 
@@ -47,10 +51,12 @@ class BTree(object):
             txn = self.dbenv.txn_begin()
             self.db.delete(req.key, txn=txn)
             txn.commit()
+            self.db.sync()
         except db.DBNotFoundError:
             txn.abort()
             raise binary.MemcachedNotFound()
-        except Exception:
+        except Exception, e:
+            logging.exception(e)
             txn.abort()
             raise binary.MemcachedError
 
@@ -59,7 +65,10 @@ class BTree(object):
 
     def doSync(self):
         try:
+            start = time.time()
             self.db.sync()
+            duration = int(time.time() - start)
+            logging.info("sync() completed in %s" % duration)
         except Exception, e:
-            print e
+            logging.exception(e)
 
