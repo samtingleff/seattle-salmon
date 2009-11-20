@@ -33,18 +33,19 @@ class DummyStorage(object):
 class SimpleBinaryServer(binary.BinaryServerProtocol):
     storage = DummyStorage()
     default_flags, default_expires, default_cas = 0, 0, 0
+    version = "0.0.1"
 
     def set_storage(cls, storage_impl):
         SimpleBinaryServer.storage = storage_impl
     set_storage = classmethod(set_storage)
 
     def doGet(req, data):
-        try:
-            val = SimpleBinaryServer.storage.doGet(req.key)
-            if val: return binary.GetResponse(req,
-                    SimpleBinaryServer.default_flags, SimpleBinaryServer.default_cas, data=val)
-            else: raise binary.MemcachedNotFound()
-        except KeyError: raise binary.MemcachedNotFound()
+        val = SimpleBinaryServer.storage.doGet(req.key)
+        if val: return binary.GetResponse(req,
+                SimpleBinaryServer.default_flags, SimpleBinaryServer.default_cas, data=val)
+        else: raise binary.MemcachedNotFound()
+
+    def doNoop(req, data): return binary.Response(req)
 
     def doSet(req, data):
         try:
@@ -55,19 +56,24 @@ class SimpleBinaryServer(binary.BinaryServerProtocol):
 
     def doDelete(req, data):
         try:
-            return SimpleBinaryServer.storage.doDelete(req, data)
+            return SimpleBinaryServer.storage.doDelete(req.key)
         except KeyError: raise binary.MemcachedNotFound()
-        except Exception:
-            raise binary.MemcachedError()
+        except Exception: raise binary.MemcachedError()
 
     def doQuit(*a): raise binary.MemcachedDisconnect()
+
+    def doVersion(req, data):
+        return binary.Response(req, data=SimpleBinaryServer.version)
 
     def sync(): return SimpleBinaryServer.storage.sync()
 
     handlers = {
         constants.CMD_GET: doGet,
+        constants.CMD_GETQ: doGet,
+        constants.CMD_NOOP: doNoop,
         constants.CMD_SET: doSet,
         constants.CMD_DELETE: doDelete,
+        constants.CMD_VERSION: doVersion,
         constants.CMD_QUIT: doQuit
     }
 
@@ -78,15 +84,32 @@ class WebResourceAdapter(resource.Resource):
         self.storage = storage
 
     def render_GET(self, request):
-        path = request.path[1:]
-        return path
+        key = request.path[1:]
+        val = self.storage.doGet(key)
+        request.setResponseCode((200, 404)[val is None])
+        request.write((val, 'Not found')[val is None])
+        request.finish()
+        return server.NOT_DONE_YET
 
     def render_PUT(self, request):
-        return 'putted'
+        key = request.path[1:]
+        data = request.content.getvalue()
+        self.storage.doSet(key, data)
+        return 'Saved'
+
+    def render_DELETE(self, request):
+        key = request.path[1:]
+        try:
+            self.storage.doDelete(key)
+            return 'Deleted'
+        except KeyError:
+            request.setResponseCode(404)
+            return 'Not found'
 
 class SeattleSalmon(daemon.Daemon):
     default_conf = '/etc/seattle-salmon.conf'
-    default_port = 8089
+    default_memcached_port = 8089
+    default_http_port = 8090
     section = 'daemon'
 
     def run(self):
@@ -100,12 +123,13 @@ class SeattleSalmon(daemon.Daemon):
         factory.protocol = SimpleBinaryServer
 
         # memcached binary protocol
-        port = int(self.get_option(self.section, 'port', default=self.default_port))
-        reactor.listenTCP(port, factory)
+        memcached_port = int(self.get_option('memcached', 'port', default=self.default_memcached_port))
+        reactor.listenTCP(memcached_port, factory)
 
         # http protocol
+        http_port = int(self.get_option('http', 'port', default=self.default_http_port))
         site = server.Site(WebResourceAdapter(storage))
-        reactor.listenTCP(8001, site)
+        reactor.listenTCP(http_port, site)
 
         # this appears to be the only way to get a repeating task that runs outside of the main thread
         repeatingTask = task.LoopingCall(lambda: reactor.callInThread(storage.sync))

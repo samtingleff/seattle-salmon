@@ -20,9 +20,6 @@ class BTree(object):
             logging.exception(e)
             txn.abort()
 
-    """
-    raises KeyError
-    """
     def doGet(self, key):
         return self.db.get(key)
 
@@ -37,11 +34,11 @@ class BTree(object):
             txn.abort()
             raise e
 
-    def doDelete(self, req, data):
+    def doDelete(self, key):
         txn = None
         try:
             txn = self.dbenv.txn_begin()
-            self.db.delete(req.key, txn=txn)
+            self.db.delete(key, txn=txn)
             txn.commit()
         except db.DBNotFoundError, e:
             txn.abort()
