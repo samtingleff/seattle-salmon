@@ -18,16 +18,6 @@ from zope.interface import Interface, implements
 
 from memcache import binary, constants
 
-class IStorageService(Interface):
-    def get(req, data): pass
-
-    def set(req, data): pass
-
-    def delete(req, data): pass
-
-class IStorageFactory(Interface):
-    pass
-
 class DummyStorage(object):
 
     def doGet(self, key, data): pass
@@ -64,32 +54,6 @@ class SimpleBinaryServer(binary.BinaryServerProtocol):
         constants.CMD_QUIT: doQuit
     }
 
-class StorageFactoryFromService(protocol.ServerFactory):
-    implements(IStorageFactory)
-    protocol = SimpleBinaryServer
-
-    def __init__(self, server):
-        self.service = service
-
-components.registerAdapter(StorageFactoryFromService,
-                           IStorageService,
-                           IStorageFactory)
-
-class StorageService(service.Service):
-    implements(IStorageService)
-
-    def __init__(self):
-        self.d = {}
-
-    def get(self, key, data): return self.d[key]
-
-    def set(self, key, data): self.d[key] = data
-
-    def delete(self, key, data): del self.d[key]
-
-class SeattleSalmonFactory(protocol.Factory):
-    protocol = SimpleBinaryServer
-
 class SeattleSalmon(daemon.Daemon):
     default_conf = '/etc/seattle-salmon.conf'
     default_port = 8089
@@ -105,13 +69,7 @@ class SeattleSalmon(daemon.Daemon):
         SimpleBinaryServer.set_storage(storage)
         factory.protocol = SimpleBinaryServer
 
-        factory = SeattleSalmonFactory()
-
-        #application = service.Application('ss', uid=1, gid=1)
-        #ss = StorageService()
-        #serviceCollection = service.IServiceCollection(application)
-        #internet.TCPServer(self.default_port, IStorageFactory(ss)).setServiceParent(serviceCollection)
-
+        # memcached binary protocol
         port = int(self.get_option(self.section, 'port', default=self.default_port))
         reactor.listenTCP(port, factory)
 
