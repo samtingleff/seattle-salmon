@@ -16,7 +16,6 @@ from twisted.application import internet, service
 from twisted.internet import reactor, protocol, defer, task
 from twisted.python import components
 from twisted.web import resource, server
-from zope.interface import Interface, implements
 
 from memcache import binary, constants
 
