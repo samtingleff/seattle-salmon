@@ -68,7 +68,7 @@ class BTree(object):
             start = time.time()
             self.db.sync()
             duration = int(time.time() - start)
-            logging.info("sync() completed in %s" % duration)
+            logging.info("sync() completed in %s seconds" % duration)
         except Exception, e:
             logging.exception(e)
 
