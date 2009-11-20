@@ -63,7 +63,7 @@ class BTree(object):
     def doQuit(self, *a):
         raise binary.MemcachedDisconnect()
 
-    def doSync(self):
+    def sync(self):
         try:
             start = time.time()
             self.db.sync()
