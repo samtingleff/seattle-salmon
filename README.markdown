@@ -1,4 +1,4 @@
 # Seattle Salmon
 
-Forked from @dustin's twisted-memcached for the twisted memcached (binary) protocol implementation.
+Seattle Salmon is a key-value server written in Python and [Twisted](http://twistedmatrix.com/) using BDB for persistence. It speaks both http and the memcached binary protocol.
 
