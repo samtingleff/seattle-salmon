@@ -1,7 +1,6 @@
 import struct
 import logging
 import time
-from memcache import binary, constants
 
 from bsddb3 import db
 
@@ -21,26 +20,22 @@ class BTree(object):
             logging.exception(e)
             txn.abort()
 
-    def doGet(self, req, data):
-        try:
-            val = self.db.get(req.key)
-            if val:
-                return binary.GetResponse(req, self.default_flags, self.default_cas, data=val)
-            else: raise binary.MemcachedNotFound()
-        except KeyError:
-            raise binary.MemcachedNotFound()
+    """
+    raises KeyError
+    """
+    def doGet(self, key):
+        return self.db.get(key)
 
-    def doSet(self, req, data):
-        flags, exp = struct.unpack(constants.SET_PKT_FMT, req.extra)
+    def doSet(self, key, val):
         txn = None
         try:
             txn = self.dbenv.txn_begin()
-            self.db.put(req.key, data, txn=txn)
+            self.db.put(key, val, txn=txn)
             txn.commit()
-        except Exception:
+        except Exception, e:
             logging.exception(e)
             txn.abort()
-            raise binary.MemcachedError
+            raise e
 
     def doDelete(self, req, data):
         txn = None
@@ -48,17 +43,13 @@ class BTree(object):
             txn = self.dbenv.txn_begin()
             self.db.delete(req.key, txn=txn)
             txn.commit()
-            self.db.sync()
-        except db.DBNotFoundError:
+        except db.DBNotFoundError, e:
             txn.abort()
-            raise binary.MemcachedNotFound()
+            raise KeyError()
         except Exception, e:
             logging.exception(e)
             txn.abort()
-            raise binary.MemcachedError
-
-    def doQuit(self, *a):
-        raise binary.MemcachedDisconnect()
+            raise e
 
     def sync(self):
         try:

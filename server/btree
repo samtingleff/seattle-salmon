@@ -10,10 +10,12 @@ sys.path.append("..")
 sys.path.append(os.path.join(sys.path[0], '..'))
 
 from storage.bdb import BTree
+from memcache import binary, constants
 
 from twisted.application import internet, service
 from twisted.internet import reactor, protocol, defer, task
 from twisted.python import components
+from twisted.web import resource, server
 from zope.interface import Interface, implements
 
 from memcache import binary, constants
@@ -26,24 +28,39 @@ class DummyStorage(object):
 
     def doDelete(self, key, data): pass
 
-    def doQuit(self, key, data): pass
-
     def sync(self): pass
 
 class SimpleBinaryServer(binary.BinaryServerProtocol):
     storage = DummyStorage()
+    default_flags, default_expires, default_cas = 0, 0, 0
 
     def set_storage(cls, storage_impl):
         SimpleBinaryServer.storage = storage_impl
     set_storage = classmethod(set_storage)
 
-    def doGet(req, data): return SimpleBinaryServer.storage.doGet(req, data)
+    def doGet(req, data):
+        try:
+            val = SimpleBinaryServer.storage.doGet(req.key)
+            if val: return binary.GetResponse(req,
+                    SimpleBinaryServer.default_flags, SimpleBinaryServer.default_cas, data=val)
+            else: raise binary.MemcachedNotFound()
+        except KeyError: raise binary.MemcachedNotFound()
 
-    def doSet(req, data): return SimpleBinaryServer.storage.doSet(req, data)
+    def doSet(req, data):
+        try:
+            flags, exp = struct.unpack(constants.SET_PKT_FMT, req.extra)
+            SimpleBinaryServer.storage.doSet(req.key, data)
+        except Exception, e:
+            raise binary.MemcachedError()
 
-    def doDelete(req, data): return SimpleBinaryServer.storage.doDelete(req, data)
+    def doDelete(req, data):
+        try:
+            return SimpleBinaryServer.storage.doDelete(req, data)
+        except KeyError: raise binary.MemcachedNotFound()
+        except Exception:
+            raise binary.MemcachedError()
 
-    def doQuit(*a): return SimpleBinaryServer.storage.doQuit(a)
+    def doQuit(*a): raise binary.MemcachedDisconnect()
 
     def sync(): return SimpleBinaryServer.storage.sync()
 
@@ -53,6 +70,19 @@ class SimpleBinaryServer(binary.BinaryServerProtocol):
         constants.CMD_DELETE: doDelete,
         constants.CMD_QUIT: doQuit
     }
+
+class WebResourceAdapter(resource.Resource):
+    isLeaf = True
+
+    def __init__(self, storage):
+        self.storage = storage
+
+    def render_GET(self, request):
+        path = request.path[1:]
+        return path
+
+    def render_PUT(self, request):
+        return 'putted'
 
 class SeattleSalmon(daemon.Daemon):
     default_conf = '/etc/seattle-salmon.conf'
@@ -72,6 +102,10 @@ class SeattleSalmon(daemon.Daemon):
         # memcached binary protocol
         port = int(self.get_option(self.section, 'port', default=self.default_port))
         reactor.listenTCP(port, factory)
+
+        # http protocol
+        site = server.Site(WebResourceAdapter(storage))
+        reactor.listenTCP(8001, site)
 
         # this appears to be the only way to get a repeating task that runs outside of the main thread
         repeatingTask = task.LoopingCall(lambda: reactor.callInThread(storage.sync))
