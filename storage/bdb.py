@@ -3,10 +3,7 @@ import logging
 import time
 from memcache import binary, constants
 
-try:
-    from bsddb3 import db
-except ImportError:
-    from bsddb import db
+from bsddb3 import db
 
 class BTree(object):
     default_flags, default_expires, default_cas = 0, 0, 0
