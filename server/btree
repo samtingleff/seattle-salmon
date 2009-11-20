@@ -124,12 +124,13 @@ class SeattleSalmon(daemon.Daemon):
 
         # memcached binary protocol
         memcached_port = int(self.get_option('memcached', 'port', default=self.default_memcached_port))
-        reactor.listenTCP(memcached_port, factory)
+        if memcached_port != 0: reactor.listenTCP(memcached_port, factory)
 
         # http protocol
         http_port = int(self.get_option('http', 'port', default=self.default_http_port))
-        site = server.Site(WebResourceAdapter(storage))
-        reactor.listenTCP(http_port, site)
+        if http_port != 0:
+            site = server.Site(WebResourceAdapter(storage))
+            reactor.listenTCP(http_port, site)
 
         # this appears to be the only way to get a repeating task that runs outside of the main thread
         repeatingTask = task.LoopingCall(lambda: reactor.callInThread(storage.sync))
