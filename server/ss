@@ -1,0 +1,147 @@
+#!/usr/bin/env python
+
+import os
+import logging
+import sys
+import struct
+import daemon
+
+sys.path.append("..")
+sys.path.append(os.path.join(sys.path[0], '..'))
+
+from storage.bdb import BTree
+from memcache import binary, constants
+
+from twisted.application import internet, service
+from twisted.internet import reactor, protocol, defer, task
+from twisted.python import components
+from twisted.web import resource, server
+from zope.interface import Interface, implements
+
+from memcache import binary, constants
+
+class DummyStorage(object):
+
+    def doGet(self, key, data): pass
+
+    def doSet(self, key, data): pass
+
+    def doDelete(self, key, data): pass
+
+    def sync(self): pass
+
+class SimpleBinaryServer(binary.BinaryServerProtocol):
+    storage = DummyStorage()
+    default_flags, default_expires, default_cas = 0, 0, 0
+    version = "0.0.1"
+
+    def set_storage(cls, storage_impl):
+        SimpleBinaryServer.storage = storage_impl
+    set_storage = classmethod(set_storage)
+
+    def doGet(req, data):
+        val = SimpleBinaryServer.storage.doGet(req.key)
+        if val: return binary.GetResponse(req,
+                SimpleBinaryServer.default_flags, SimpleBinaryServer.default_cas, data=val)
+        else: raise binary.MemcachedNotFound()
+
+    def doNoop(req, data): return binary.Response(req)
+
+    def doSet(req, data):
+        try:
+            flags, exp = struct.unpack(constants.SET_PKT_FMT, req.extra)
+            SimpleBinaryServer.storage.doSet(req.key, data)
+        except Exception, e:
+            raise binary.MemcachedError()
+
+    def doDelete(req, data):
+        try:
+            return SimpleBinaryServer.storage.doDelete(req.key)
+        except KeyError: raise binary.MemcachedNotFound()
+        except Exception: raise binary.MemcachedError()
+
+    def doQuit(*a): raise binary.MemcachedDisconnect()
+
+    def doVersion(req, data):
+        return binary.Response(req, data=SimpleBinaryServer.version)
+
+    def sync(): return SimpleBinaryServer.storage.sync()
+
+    handlers = {
+        constants.CMD_GET: doGet,
+        constants.CMD_GETQ: doGet,
+        constants.CMD_NOOP: doNoop,
+        constants.CMD_SET: doSet,
+        constants.CMD_DELETE: doDelete,
+        constants.CMD_VERSION: doVersion,
+        constants.CMD_QUIT: doQuit
+    }
+
+class WebResourceAdapter(resource.Resource):
+    isLeaf = True
+
+    def __init__(self, storage):
+        self.storage = storage
+
+    def render_GET(self, request):
+        key = request.path[1:]
+        val = self.storage.doGet(key)
+        request.setResponseCode((200, 404)[val is None])
+        request.write((val, 'Not found')[val is None])
+        request.finish()
+        return server.NOT_DONE_YET
+
+    def render_PUT(self, request):
+        key = request.path[1:]
+        data = request.content.getvalue()
+        self.storage.doSet(key, data)
+        return 'Saved'
+
+    def render_DELETE(self, request):
+        key = request.path[1:]
+        try:
+            self.storage.doDelete(key)
+            return 'Deleted'
+        except KeyError:
+            request.setResponseCode(404)
+            return 'Not found'
+
+class SeattleSalmon(daemon.Daemon):
+    default_conf = '/etc/seattle-salmon.conf'
+    default_memcached_port = 8089
+    default_http_port = 8090
+    section = 'daemon'
+
+    def run(self):
+        factory = protocol.Factory()
+        storage = BTree(
+                self.get_option('bdb', 'data-dir', default='tmp/data'),
+                self.get_option('bdb', 'log-dir', default='tmp/logs'),
+                cache_gbytes=int(self.get_option('bdb', 'cache-gbytes', default='1')),
+                cache_bytes=int(self.get_option('bdb', 'cache-bytes', default='0')))
+        SimpleBinaryServer.set_storage(storage)
+        factory.protocol = SimpleBinaryServer
+
+        # memcached binary protocol
+        memcached_port = int(self.get_option('memcached', 'port', default=self.default_memcached_port))
+        if memcached_port != 0: reactor.listenTCP(memcached_port, factory)
+
+        # http protocol
+        http_port = int(self.get_option('http', 'port', default=self.default_http_port))
+        if http_port != 0:
+            site = server.Site(WebResourceAdapter(storage))
+            reactor.listenTCP(http_port, site)
+
+        # this appears to be the only way to get a repeating task that runs outside of the main thread
+        repeatingTask = task.LoopingCall(lambda: reactor.callInThread(storage.sync))
+        repeatingTask.start(int(self.get_option('bdb', 'sync-frequency', default='60')), now=False)
+
+        reactor.run()
+
+if __name__ == '__main__':
+    ss = SeattleSalmon()
+    ss.parse_options()
+    ss.main()
+    #ss.read_basic_config()
+    #ss.run()
+
