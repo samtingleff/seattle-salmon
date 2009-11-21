@@ -51,6 +51,8 @@ class BTree(object):
         try:
             start = time.time()
             self.db.sync()
+            self.dbenv.log_flush()
+            self.dbenv.txn_checkpoint()
             duration = int(time.time() - start)
             logging.info("sync() completed in %s seconds" % duration)
         except Exception, e:
