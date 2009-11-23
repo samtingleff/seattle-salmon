@@ -19,10 +19,10 @@ class BTree(object):
             logging.exception(e)
             txn.abort()
 
-    def doGet(self, key):
+    def get(self, key):
         return self.db.get(key)
 
-    def doSet(self, key, val):
+    def set(self, key, val):
         txn = None
         try:
             txn = self.dbenv.txn_begin()
@@ -33,7 +33,7 @@ class BTree(object):
             txn.abort()
             raise e
 
-    def doDelete(self, key):
+    def delete(self, key):
         txn = None
         try:
             txn = self.dbenv.txn_begin()

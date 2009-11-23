@@ -21,11 +21,11 @@ from memcache import binary, constants
 
 class DummyStorage(object):
 
-    def doGet(self, key, data): pass
+    def get(self, key, data): pass
 
-    def doSet(self, key, data): pass
+    def set(self, key, data): pass
 
-    def doDelete(self, key, data): pass
+    def delete(self, key, data): pass
 
     def sync(self): pass
 
@@ -38,42 +38,42 @@ class SimpleBinaryServer(binary.BinaryServerProtocol):
         SimpleBinaryServer.storage = storage_impl
     set_storage = classmethod(set_storage)
 
-    def doGet(req, data):
-        val = SimpleBinaryServer.storage.doGet(req.key)
+    def get(req, data):
+        val = SimpleBinaryServer.storage.get(req.key)
         if val: return binary.GetResponse(req,
                 SimpleBinaryServer.default_flags, SimpleBinaryServer.default_cas, data=val)
         else: raise binary.MemcachedNotFound()
 
-    def doNoop(req, data): return binary.Response(req)
+    def noop(req, data): return binary.Response(req)
 
-    def doSet(req, data):
+    def set(req, data):
         try:
             flags, exp = struct.unpack(constants.SET_PKT_FMT, req.extra)
-            SimpleBinaryServer.storage.doSet(req.key, data)
+            SimpleBinaryServer.storage.set(req.key, data)
         except Exception, e:
             raise binary.MemcachedError()
 
-    def doDelete(req, data):
+    def delete(req, data):
         try:
-            return SimpleBinaryServer.storage.doDelete(req.key)
+            return SimpleBinaryServer.storage.delete(req.key)
         except KeyError: raise binary.MemcachedNotFound()
         except Exception: raise binary.MemcachedError()
 
-    def doQuit(*a): raise binary.MemcachedDisconnect()
+    def quit(*a): raise binary.MemcachedDisconnect()
 
-    def doVersion(req, data):
+    def version(req, data):
         return binary.Response(req, data=SimpleBinaryServer.version)
 
     def sync(): return SimpleBinaryServer.storage.sync()
 
     handlers = {
-        constants.CMD_GET: doGet,
-        constants.CMD_GETQ: doGet,
-        constants.CMD_NOOP: doNoop,
-        constants.CMD_SET: doSet,
-        constants.CMD_DELETE: doDelete,
-        constants.CMD_VERSION: doVersion,
-        constants.CMD_QUIT: doQuit
+        constants.CMD_GET: get,
+        constants.CMD_GETQ: get,
+        constants.CMD_NOOP: noop,
+        constants.CMD_SET: set,
+        constants.CMD_DELETE: delete,
+        constants.CMD_VERSION: version,
+        constants.CMD_QUIT: quit
     }
 
 class WebResourceAdapter(resource.Resource):
@@ -84,7 +84,7 @@ class WebResourceAdapter(resource.Resource):
 
     def render_GET(self, request):
         key = request.path[1:]
-        val = self.storage.doGet(key)
+        val = self.storage.get(key)
         request.setResponseCode((200, 404)[val is None])
         request.write((val, 'Not found')[val is None])
         request.finish()
@@ -93,13 +93,13 @@ class WebResourceAdapter(resource.Resource):
     def render_PUT(self, request):
         key = request.path[1:]
         data = request.content.getvalue()
-        self.storage.doSet(key, data)
+        self.storage.set(key, data)
         return 'Saved'
 
     def render_DELETE(self, request):
         key = request.path[1:]
         try:
-            self.storage.doDelete(key)
+            self.storage.delete(key)
             return 'Deleted'
         except KeyError:
             request.setResponseCode(404)
