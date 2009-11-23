@@ -29,19 +29,19 @@ class DummyStorage(object):
 
     def sync(self): pass
 
-class SimpleBinaryServer(binary.BinaryServerProtocol):
+class MemcachedBinaryProtocol(binary.BinaryServerProtocol):
     storage = DummyStorage()
     default_flags, default_expires, default_cas = 0, 0, 0
     version = "0.0.1"
 
     def set_storage(cls, storage_impl):
-        SimpleBinaryServer.storage = storage_impl
+        MemcachedBinaryProtocol.storage = storage_impl
     set_storage = classmethod(set_storage)
 
     def get(req, data):
-        val = SimpleBinaryServer.storage.get(req.key)
+        val = MemcachedBinaryProtocol.storage.get(req.key)
         if val: return binary.GetResponse(req,
-                SimpleBinaryServer.default_flags, SimpleBinaryServer.default_cas, data=val)
+                MemcachedBinaryProtocol.default_flags, MemcachedBinaryProtocol.default_cas, data=val)
         else: raise binary.MemcachedNotFound()
 
     def noop(req, data): return binary.Response(req)
@@ -49,22 +49,22 @@ class SimpleBinaryServer(binary.BinaryServerProtocol):
     def set(req, data):
         try:
             flags, exp = struct.unpack(constants.SET_PKT_FMT, req.extra)
-            SimpleBinaryServer.storage.set(req.key, data)
+            MemcachedBinaryProtocol.storage.set(req.key, data)
         except Exception, e:
             raise binary.MemcachedError()
 
     def delete(req, data):
         try:
-            return SimpleBinaryServer.storage.delete(req.key)
+            return MemcachedBinaryProtocol.storage.delete(req.key)
         except KeyError: raise binary.MemcachedNotFound()
         except Exception: raise binary.MemcachedError()
 
     def quit(*a): raise binary.MemcachedDisconnect()
 
     def version(req, data):
-        return binary.Response(req, data=SimpleBinaryServer.version)
+        return binary.Response(req, data=MemcachedBinaryProtocol.version)
 
-    def sync(): return SimpleBinaryServer.storage.sync()
+    def sync(): return MemcachedBinaryProtocol.storage.sync()
 
     handlers = {
         constants.CMD_GET: get,
@@ -118,8 +118,8 @@ class SeattleSalmon(daemon.Daemon):
                 self.get_option('bdb', 'log-dir', default='tmp/logs'),
                 cache_gbytes=int(self.get_option('bdb', 'cache-gbytes', default='1')),
                 cache_bytes=int(self.get_option('bdb', 'cache-bytes', default='0')))
-        SimpleBinaryServer.set_storage(storage)
-        factory.protocol = SimpleBinaryServer
+        MemcachedBinaryProtocol.set_storage(storage)
+        factory.protocol = MemcachedBinaryProtocol
 
         # memcached binary protocol
         memcached_port = int(self.get_option('memcached', 'port', default=self.default_memcached_port))
