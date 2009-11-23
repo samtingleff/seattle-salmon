@@ -123,11 +123,12 @@ class SeattleSalmon(daemon.Daemon):
                 self.get_option('bdb', 'log-dir', default='tmp/logs'),
                 cache_gbytes=self.get_int_option('bdb', 'cache-gbytes', default=1),
                 cache_bytes=self.get_int_option('bdb', 'cache-bytes', default=0),
-                lk_max_locks=self.get_int_option('bdb', 'lk_max_locks', default=1000),
-                lk_max_lockers=self.get_int_option('bdb', 'lk_max_lockers', default=1000),
-                lk_max_objects=self.get_int_option('bdb', 'lk_max_objects', default=1000))
+                lk_max_locks=self.get_int_option('bdb', 'lk-max-locks', default=1000),
+                lk_max_lockers=self.get_int_option('bdb', 'lk-max-lockers', default=1000),
+                lk_max_objects=self.get_int_option('bdb', 'lk-max-objects', default=1000))
 
-        if bool(self.get_bool_option('bdb', 'queue-sets', default=False)): storage = QueuedStorage(bdb)
+        if bool(self.get_bool_option('bdb', 'queue-sets', default=False)):
+            storage = QueuedStorage(bdb, limit=self.get_int_option('bdb', 'queue-sets-limit', default=10000))
         else: storage = bdb
 
         MemcachedBinaryProtocol.set_storage(storage)
