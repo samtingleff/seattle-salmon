@@ -130,6 +130,10 @@ class Daemon(object):
         opt = self.get_option(section, key, default=default)
         return {'true': True, 'false': False}.get(str(opt).lower())
 
+    def get_int_option(self, section, key, default=0):
+        opt = self.get_option(section, key, default=default)
+        return int(opt)
+
     def read_basic_config(self):
         """Read basic options from the daemon config file"""
         self.config_filename = self.options.config_filename
