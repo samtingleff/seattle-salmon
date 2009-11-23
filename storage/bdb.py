@@ -33,11 +33,36 @@ class BTree(object):
             txn.abort()
             raise e
 
+    def set_bulk(self, dict):
+        txn = None
+        try:
+            txn = self.dbenv.txn_begin()
+            for key in dict.keys(): self.db.put(key, dict[key], txn=txn)
+            txn.commit()
+        except Exception, e:
+            logging.exception(e)
+            txn.abort()
+            raise e
+
     def delete(self, key):
         txn = None
         try:
             txn = self.dbenv.txn_begin()
             self.db.delete(key, txn=txn)
+            txn.commit()
+        except db.DBNotFoundError, e:
+            txn.abort()
+            raise KeyError()
+        except Exception, e:
+            logging.exception(e)
+            txn.abort()
+            raise e
+
+    def delete_bulk(self, keys):
+        txn = None
+        try:
+            txn = self.dbenv.txn_begin()
+            for key in keys: self.db.delete(key, txn=txn)
             txn.commit()
         except db.DBNotFoundError, e:
             txn.abort()
