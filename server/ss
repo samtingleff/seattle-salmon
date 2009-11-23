@@ -10,6 +10,7 @@ sys.path.append("..")
 sys.path.append(os.path.join(sys.path[0], '..'))
 
 from storage.bdb import BTree
+from storage.queue import QueuedStorage, QueueFullException
 from memcache import binary, constants
 
 from twisted.application import internet, service
@@ -26,6 +27,8 @@ class DummyStorage(object):
     def set(self, key, data): pass
 
     def delete(self, key, data): pass
+
+    def flush(self): pass
 
     def sync(self): pass
 
@@ -63,6 +66,8 @@ class MemcachedBinaryProtocol(binary.BinaryServerProtocol):
 
     def version(req, data):
         return binary.Response(req, data=MemcachedBinaryProtocol.version)
+
+    def flush(): return MemcachedBinaryProtocol.storage.flush()
 
     def sync(): return MemcachedBinaryProtocol.storage.sync()
 
@@ -113,11 +118,18 @@ class SeattleSalmon(daemon.Daemon):
 
     def run(self):
         factory = protocol.Factory()
-        storage = BTree(
+        bdb = BTree(
                 self.get_option('bdb', 'data-dir', default='tmp/data'),
                 self.get_option('bdb', 'log-dir', default='tmp/logs'),
-                cache_gbytes=int(self.get_option('bdb', 'cache-gbytes', default='1')),
-                cache_bytes=int(self.get_option('bdb', 'cache-bytes', default='0')))
+                cache_gbytes=self.get_int_option('bdb', 'cache-gbytes', default=1),
+                cache_bytes=self.get_int_option('bdb', 'cache-bytes', default=0),
+                lk_max_locks=self.get_int_option('bdb', 'lk_max_locks', default=1000),
+                lk_max_lockers=self.get_int_option('bdb', 'lk_max_lockers', default=1000),
+                lk_max_objects=self.get_int_option('bdb', 'lk_max_objects', default=1000))
+
+        if bool(self.get_bool_option('bdb', 'queue-sets', default=False)): storage = QueuedStorage(bdb)
+        else: storage = bdb
+
         MemcachedBinaryProtocol.set_storage(storage)
         factory.protocol = MemcachedBinaryProtocol
 
@@ -131,9 +143,14 @@ class SeattleSalmon(daemon.Daemon):
             site = server.Site(WebResourceAdapter(storage))
             reactor.listenTCP(http_port, site)
 
+        # call flush() every x seconds
         # this appears to be the only way to get a repeating task that runs outside of the main thread
-        repeatingTask = task.LoopingCall(lambda: reactor.callInThread(storage.sync))
-        repeatingTask.start(int(self.get_option('bdb', 'sync-frequency', default='60')), now=False)
+        flush_task = task.LoopingCall(lambda: reactor.callInThread(storage.flush))
+        flush_task.start(int(self.get_int_option('bdb', 'flush-frequency', default=5)), now=False)
+
+        # call sync() every y seconds
+        sync_task = task.LoopingCall(lambda: reactor.callInThread(storage.sync))
+        sync_task.start(int(self.get_int_option('bdb', 'sync-frequency', default=60)), now=False)
 
         reactor.run()
 

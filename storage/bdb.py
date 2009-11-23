@@ -5,10 +5,13 @@ from bsddb3 import db
 
 class BTree(object):
     default_flags, default_expires, default_cas = 0, 0, 0
-    def __init__(self, datadir, logdir, cache_gbytes=1, cache_bytes=0):
+    def __init__(self, datadir, homedir, cache_gbytes=1, cache_bytes=0, lk_max_locks=1000, lk_max_lockers=1000, lk_max_objects=1000):
         self.dbenv = db.DBEnv()
         self.dbenv.set_cachesize(cache_gbytes, cache_bytes)
-        self.dbenv.open(logdir, db.DB_INIT_LOCK | db.DB_INIT_LOG | db.DB_INIT_MPOOL | db.DB_INIT_TXN | db.DB_RECOVER | db.DB_USE_ENVIRON | db.DB_USE_ENVIRON_ROOT | db.DB_CREATE | db.DB_REGISTER | db.DB_THREAD | db.DB_READ_COMMITTED | db.DB_TXN_NOWAIT | db.DB_TXN_NOSYNC)
+        self.dbenv.set_lk_max_locks(lk_max_locks)
+        self.dbenv.set_lk_max_lockers(lk_max_lockers)
+        self.dbenv.set_lk_max_objects(lk_max_objects)
+        self.dbenv.open(homedir, db.DB_INIT_LOCK | db.DB_INIT_LOG | db.DB_INIT_MPOOL | db.DB_INIT_TXN | db.DB_RECOVER | db.DB_USE_ENVIRON | db.DB_USE_ENVIRON_ROOT | db.DB_CREATE | db.DB_REGISTER | db.DB_THREAD | db.DB_READ_COMMITTED | db.DB_TXN_NOWAIT | db.DB_TXN_NOSYNC)
         txn = None
         try:
             txn = self.dbenv.txn_begin()
@@ -26,12 +29,15 @@ class BTree(object):
         txn = None
         try:
             txn = self.dbenv.txn_begin()
-            self.db.put(key, val, txn=txn)
+            self.set_txn(key, val, txn)
             txn.commit()
         except Exception, e:
             logging.exception(e)
             txn.abort()
             raise e
+
+    def set_txn(self, key, val, txn):
+        self.db.put(key, val, txn=txn)
 
     def set_bulk(self, dict):
         txn = None
@@ -48,7 +54,7 @@ class BTree(object):
         txn = None
         try:
             txn = self.dbenv.txn_begin()
-            self.db.delete(key, txn=txn)
+            self.delete(key, txn)
             txn.commit()
         except db.DBNotFoundError, e:
             txn.abort()
@@ -57,12 +63,16 @@ class BTree(object):
             logging.exception(e)
             txn.abort()
             raise e
+
+    def delete_txn(self, key, val, txn):
+        try: self.db.delete(key, txn=txn)
+        except db.DBNotFoundError: pass
 
     def delete_bulk(self, keys):
         txn = None
         try:
             txn = self.dbenv.txn_begin()
-            for key in keys: self.db.delete(key, txn=txn)
+            for key in keys: self.delete_txn(key, txn)
             txn.commit()
         except db.DBNotFoundError, e:
             txn.abort()
@@ -72,11 +82,25 @@ class BTree(object):
             txn.abort()
             raise e
 
+    def create_txn(self): return self.dbenv.txn_begin()
+
+    def commit_txn(self, txn): txn.commit()
+
+    def abort_txn(self, txn): txn.abort()
+
+    def flush(self):
+        try:
+            start = time.time()
+            self.dbenv.log_flush()
+            duration = int(time.time() - start)
+            logging.info("flush() completed in %s seconds" % duration)
+        except Exception, e:
+            logging.exception(e)
+
     def sync(self):
         try:
             start = time.time()
             self.db.sync()
-            self.dbenv.log_flush()
             self.dbenv.txn_checkpoint()
             duration = int(time.time() - start)
             logging.info("sync() completed in %s seconds" % duration)
