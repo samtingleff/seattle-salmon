@@ -39,7 +39,7 @@ class QueuedStorage(object):
         self.queue.push( (self.backend.delete_txn, key, None) )
 
     def delete_bulk(self, keys):
-        self.delete(key)
+        for key in keys: self.delete(key)
 
     def flush(self):
         start = time.time()
