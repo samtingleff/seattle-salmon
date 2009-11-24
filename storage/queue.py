@@ -58,8 +58,7 @@ class QueuedStorage(object):
             self.backend.abort_txn(txn)
         self.backend.flush()
         duration = int(time.time() - start)
-        logging.info("flushed %d items in %s seconds" % (flushed, duration))
-        self.to_flush.clear()
+        logging.info("flushed %d items from queue in %s seconds" % (flushed, duration))
 
     def sync(self): self.backend.sync()
 
