@@ -1,13 +1,13 @@
 import logging
 import time
-from threading import Lock
+from threading import RLock
 
 class QueueFullException(Exception):
     pass
 
 class BoundedSynchronizedDictionary(dict):
     def __init__(self, limit=100):
-        self.lock = Lock()
+        self.lock = RLock()
         self.limit = limit
 
     def __getitem__(self, key):
