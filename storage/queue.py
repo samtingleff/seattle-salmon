@@ -11,9 +11,7 @@ class BoundedSynchronizedDictionary(dict):
         self.limit = limit
 
     def __getitem__(self, key):
-        self.lock.acquire()
-        try: return dict.__getitem__(self, key)
-        finally: self.lock.release()
+        return dict.__getitem__(self, key)
 
     def __setitem__(self, key, value):
         if len(dict(self)) >= self.limit:
