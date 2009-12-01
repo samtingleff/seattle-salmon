@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import time
 
@@ -5,7 +6,10 @@ from bsddb3 import db
 
 class BTree(object):
     default_flags, default_expires, default_cas = 0, 0, 0
-    def __init__(self, datadir, homedir, cache_gbytes=1, cache_bytes=0, lk_max_locks=1000, lk_max_lockers=1000, lk_max_objects=1000):
+    def __init__(self, datadir, homedir, splits=1, cache_gbytes=1, cache_bytes=0, lk_max_locks=1000, lk_max_lockers=1000, lk_max_objects=1000):
+        self.datadir = datadir
+        self.homedir = homedir
+        self.dbs = []
         self.dbenv = db.DBEnv()
         self.dbenv.set_cachesize(cache_gbytes, cache_bytes)
         self.dbenv.set_lk_max_locks(lk_max_locks)
@@ -15,15 +19,17 @@ class BTree(object):
         txn = None
         try:
             txn = self.dbenv.txn_begin()
-            self.db = db.DB(dbEnv=self.dbenv)
-            self.db.open("%s/data-1.db" % datadir, None, dbtype=db.DB_BTREE, flags=db.DB_CREATE | db.DB_READ_UNCOMMITTED | db.DB_THREAD | db.DB_TXN_NOSYNC, txn=txn)
+            for i in range(splits):
+                d = db.DB(dbEnv=self.dbenv)
+                d.open("%s/data-%d.db" % (datadir, i), None, dbtype=db.DB_BTREE, flags=db.DB_CREATE | db.DB_READ_UNCOMMITTED | db.DB_THREAD | db.DB_TXN_NOSYNC, txn=txn)
+                self.dbs += [d]
             txn.commit()
         except Exception, e:
             logging.exception(e)
             txn.abort()
 
     def get(self, key):
-        return self.db.get(key)
+        return self._get_db(key).get(key)
 
     def set(self, key, val):
         txn = None
@@ -37,13 +43,13 @@ class BTree(object):
             raise e
 
     def set_txn(self, key, val, txn):
-        self.db.put(key, val, txn=txn)
+        self._get_db(key).put(key, val, txn=txn)
 
     def set_bulk(self, dict):
         txn = None
         try:
             txn = self.dbenv.txn_begin()
-            for key in dict.keys(): self.db.put(key, dict[key], txn=txn)
+            for key in dict.keys(): self._get_db(key).put(key, dict[key], txn=txn)
             txn.commit()
         except Exception, e:
             logging.exception(e)
@@ -65,7 +71,7 @@ class BTree(object):
             raise e
 
     def delete_txn(self, key, val, txn):
-        try: self.db.delete(key, txn=txn)
+        try: self._get_db(key).delete(key, txn=txn)
         except db.DBNotFoundError: pass
 
     def delete_bulk(self, keys):
@@ -99,11 +105,17 @@ class BTree(object):
 
     def sync(self):
         try:
-            start = time.time()
-            self.db.sync()
+            for i, d in enumerate(self.dbs):
+                sync_start = time.time()
+                d.sync()
+                logging.info("sync() on db #%d completed in %s seconds" % (i, int(time.time() - sync_start)))
+            txn_checkpoint_start = time.time()
             self.dbenv.txn_checkpoint()
-            duration = int(time.time() - start)
-            logging.info("sync() completed in %s seconds" % duration)
+            logging.info("txn_checkpoint() completed in %s seconds" % int(time.time() - txn_checkpoint_start))
         except Exception, e:
             logging.exception(e)
 
+    def _get_db(self, key):
+        if len(self.dbs) == 1: return self.dbs[0]
+        else:
+            return self.dbs[int(hashlib.md5(key).hexdigest(), 16) % len(self.dbs)]

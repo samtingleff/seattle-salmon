@@ -121,6 +121,7 @@ class SeattleSalmon(daemon.Daemon):
         bdb = BTree(
                 self.get_option('bdb', 'data-dir', default='tmp/data'),
                 self.get_option('bdb', 'log-dir', default='tmp/logs'),
+                self.get_int_option('bdb', 'splits', default=1),
                 cache_gbytes=self.get_int_option('bdb', 'cache-gbytes', default=1),
                 cache_bytes=self.get_int_option('bdb', 'cache-bytes', default=0),
                 lk_max_locks=self.get_int_option('bdb', 'lk-max-locks', default=1000),
