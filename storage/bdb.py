@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import struct
 import time
 
 from bsddb3 import db
@@ -118,4 +119,4 @@ class BTree(object):
     def _get_db(self, key):
         if len(self.dbs) == 1: return self.dbs[0]
         else:
-            return self.dbs[int(hashlib.md5(key).hexdigest(), 16) % len(self.dbs)]
+            return self.dbs[struct.unpack('Q', hashlib.md5(key).digest()[:8])[0] % len(self.dbs)]
