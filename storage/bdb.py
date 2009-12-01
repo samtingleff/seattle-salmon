@@ -54,7 +54,7 @@ class BTree(object):
         txn = None
         try:
             txn = self.dbenv.txn_begin()
-            self.delete(key, txn)
+            self.delete_txn(key, None, txn)
             txn.commit()
         except db.DBNotFoundError, e:
             txn.abort()
