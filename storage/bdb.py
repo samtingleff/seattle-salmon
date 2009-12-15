@@ -6,6 +6,39 @@ import time
 
 from bsddb3 import db
 
+class BTreeIterator(object):
+    def __init__(self, dbenv, dbs):
+        self.dbenv = dbenv
+        self.dbs = dbs
+        self.index = 0
+        self._next_cursor()
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if not self.next:
+            raise StopIteration
+
+        obj = self.next
+
+        self.next = self.cursor.next()
+        if not self.next:
+            self.cursor.close()
+            self.index += 1
+            self._next_cursor()
+
+        return obj
+
+    def _next_cursor(self):
+        self.cursor = self.dbs[self.index].cursor()
+        self.next = self.cursor.first()
+        if not self.next:
+            self.cursor.close()
+            if self.index < len(self.dbs) - 1:
+                self.index += 1
+                return self._next_cursor()
+
 class BTree(object):
     default_flags, default_expires, default_cas = 0, 0, 0
     def __init__(self, daemon):
@@ -92,6 +125,9 @@ class BTree(object):
             txn.abort()
             raise e
 
+    def iterator(self):
+        return BTreeIterator(self.dbenv, self.dbs)
+
     def create_txn(self): return self.dbenv.txn_begin()
 
     def commit_txn(self, txn): txn.commit()
@@ -126,6 +162,16 @@ class BTree(object):
                 os.remove("%s/%s" % (self.homedir, log))
         except Exception, e:
             logging.exception(e)
+
+    def close(self):
+        try:
+            for i, d in enumerate(self.dbs):
+                d.close()
+            self.dbenv.close()
+            logging.info("closed all databases")
+        except Exception, e:
+            logging.exception(e)
+            raise e
 
     def _get_db(self, key):
         if len(self.dbs) == 1: return self.dbs[0]
