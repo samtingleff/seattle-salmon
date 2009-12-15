@@ -169,6 +169,11 @@ class SeattleSalmon(daemon.Daemon):
         sync_task = task.LoopingCall(lambda: reactor.callInThread(storage.sync))
         sync_task.start(int(self.get_int_option('bdb', 'sync-frequency', default=60)), now=False)
 
+        # delete bdb logs every z seconds
+        if self.get_bool_option('bdb', 'delete-logs', default=True):
+            cleanup_task = task.LoopingCall(lambda: reactor.callInThread(storage.cleanup))
+            cleanup_task.start(int(self.get_int_option('bdb', 'cleanup-frequency', default=60)), now=False)
+
         reactor.run()
 
 if __name__ == '__main__':

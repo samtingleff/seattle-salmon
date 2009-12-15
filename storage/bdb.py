@@ -1,5 +1,6 @@
 import logging
 import md5
+import os
 import struct
 import time
 
@@ -115,6 +116,14 @@ class BTree(object):
             txn_checkpoint_start = time.time()
             self.dbenv.txn_checkpoint()
             logging.info("txn_checkpoint() completed in %s seconds" % int(time.time() - txn_checkpoint_start))
+        except Exception, e:
+            logging.exception(e)
+
+    def cleanup(self):
+        try:
+            logs = self.dbenv.log_archive()
+            for log in logs:
+                os.remove("%s/%s" % (self.homedir, log))
         except Exception, e:
             logging.exception(e)
 
