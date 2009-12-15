@@ -86,29 +86,52 @@ class WebResourceAdapter(resource.Resource):
 
     def __init__(self, storage):
         self.storage = storage
+        self.routes = {
+                '/c/':{'GET':self._get_value, 'PUT':self._put_value, 'DELETE':self._delete_value}}
 
     def render_GET(self, request):
-        key = request.path[1:]
+        op = self._route(request.path[:3], 'GET')
+        return op(request)
+
+    def render_PUT(self, request):
+        op = self._route(request.path[:3], 'PUT')
+        return op(request)
+
+    def render_DELETE(self, request):
+        op = self._route(request.path[:3], 'DELETE')
+        return op(request)
+
+    def _route(self, path, operation):
+        try: op = self.routes[path][operation]
+        except KeyError: op = self._default_action
+        return op
+
+    def _get_value(self, request):
+        key = request.path[3:]
         val = self.storage.get(key)
         request.setResponseCode((200, 404)[val is None])
         request.write((val, 'Not found')[val is None])
         request.finish()
         return server.NOT_DONE_YET
 
-    def render_PUT(self, request):
-        key = request.path[1:]
+    def _put_value(self, request):
+        key = request.path[3:]
         data = request.content.getvalue()
         self.storage.set(key, data)
         return 'Saved'
 
-    def render_DELETE(self, request):
-        key = request.path[1:]
+    def _delete_value(self, request):
+        key = request.path[3:]
         try:
             self.storage.delete(key)
             return 'Deleted'
         except KeyError:
             request.setResponseCode(404)
             return 'Not found'
+
+    def _default_action(self, request):
+        request.setResponseCode(404)
+        return 'Unknown action'
 
 class SeattleSalmon(daemon.Daemon):
     default_conf = '/etc/seattle-salmon.conf'
