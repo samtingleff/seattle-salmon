@@ -32,6 +32,7 @@ class BTreeTestCase(unittest.TestCase):
             found[key] = self.storage.get(key)
         self.assertEquals(len(self.values), len(found))
         self.assertEquals(self.values, found)
+        for key in self.values.keys(): self.storage.delete(key)
 
 if __name__ == '__main__':
     unittest.main()
