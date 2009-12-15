@@ -16,6 +16,9 @@ class BTreeIterator(object):
     def __iter__(self):
         return self
 
+    def close(self):
+        if self.cursor: self._close_cursor()
+
     def next(self):
         if not self.next:
             raise StopIteration
@@ -24,7 +27,7 @@ class BTreeIterator(object):
 
         self.next = self.cursor.next()
         if not self.next:
-            self.cursor.close()
+            self._close_cursor()
             self.index += 1
             self._next_cursor()
 
@@ -34,10 +37,14 @@ class BTreeIterator(object):
         self.cursor = self.dbs[self.index].cursor()
         self.next = self.cursor.first()
         if not self.next:
-            self.cursor.close()
+            self._close_cursor()
             if self.index < len(self.dbs) - 1:
                 self.index += 1
                 return self._next_cursor()
+
+    def _close_cursor(self):
+        self.cursor.close()
+        self.cursor = None
 
 class BTree(object):
     default_flags, default_expires, default_cas = 0, 0, 0
