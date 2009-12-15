@@ -118,15 +118,7 @@ class SeattleSalmon(daemon.Daemon):
 
     def run(self):
         factory = protocol.Factory()
-        bdb = BTree(
-                self.get_option('bdb', 'data-dir', default='tmp/data'),
-                self.get_option('bdb', 'log-dir', default='tmp/logs'),
-                self.get_int_option('bdb', 'splits', default=1),
-                cache_gbytes=self.get_int_option('bdb', 'cache-gbytes', default=1),
-                cache_bytes=self.get_int_option('bdb', 'cache-bytes', default=0),
-                lk_max_locks=self.get_int_option('bdb', 'lk-max-locks', default=1000),
-                lk_max_lockers=self.get_int_option('bdb', 'lk-max-lockers', default=1000),
-                lk_max_objects=self.get_int_option('bdb', 'lk-max-objects', default=1000))
+        bdb = BTree(self)
 
         if bool(self.get_bool_option('bdb', 'queue-writes', default=False)):
             storage = QueuedStorage(bdb, limit=self.get_int_option('bdb', 'queue-writes-limit', default=10000))
