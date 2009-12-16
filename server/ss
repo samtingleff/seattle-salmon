@@ -143,9 +143,7 @@ class WebResourceAdapter(resource.Resource):
         try:
             if iter.has_next():
                 key, value = iter.next_item()
-                request.setResponseCode(200)
-                request.setHeader('X-iterator-key', key)
-                request.write(value)
+                request.redirect("/c/%s" % key)
                 request.finish()
                 return server.NOT_DONE_YET
             else:
