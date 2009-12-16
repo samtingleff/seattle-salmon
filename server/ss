@@ -207,7 +207,7 @@ class WebResourceAdapter(resource.Resource):
         code_string = request.content.getvalue()
         driver = KeyValueIteratorDriver(self.storage, code_string)
         driver.run()
-        request.setResponseCode(404)
+        request.setResponseCode(200)
         request.write("iterator completed")
         request.finish()
         return server.NOT_DONE_YET
