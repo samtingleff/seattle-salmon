@@ -2,8 +2,11 @@
 
 import os
 import logging
+import parser
 import sys
 import struct
+import time
+
 import daemon
 
 sys.path.append("..")
@@ -54,6 +57,7 @@ class MemcachedBinaryProtocol(binary.BinaryServerProtocol):
             flags, exp = struct.unpack(constants.SET_PKT_FMT, req.extra)
             MemcachedBinaryProtocol.storage.set(req.key, data)
         except Exception, e:
+            print e
             raise binary.MemcachedError()
 
     def delete(req, data):
@@ -81,6 +85,37 @@ class MemcachedBinaryProtocol(binary.BinaryServerProtocol):
         constants.CMD_QUIT: quit
     }
 
+class KeyValueIteratorDriver(object):
+    def __init__(self, storage, code_string):
+        self.storage = storage
+        code = self._compile_code_string(code_string)
+        exec(code)
+        self.visitor = get_key_value_iterator()
+        logging.info("compiled IKeyValueIterator %s" % self.visitor)
+
+    def run(self):
+        self.visitor.configure(self.storage)
+
+        iterator = self.storage.iterator()
+        start = time.time()
+        logging.info("starting iterator on %s" % self.visitor)
+        try:
+            while (iterator.has_next()):
+                try:
+                    key, value = iterator.next_item()
+                    self.visitor.item(key, value)
+                except StopIteration: break
+        finally:
+            logging.info("completed iterator on %s in %s seconds" % (self.visitor, int(time.time() - start)))
+            try: iterator.close()
+            except Exception, e: logging.exception(e)
+            self.visitor.close()
+
+    def _compile_code_string(self, code_string):
+        ast = parser.suite(code_string)
+        code = ast.compile()
+        return code
+
 class WebResourceAdapter(resource.Resource):
     isLeaf = True
 
@@ -88,7 +123,8 @@ class WebResourceAdapter(resource.Resource):
         self.storage = storage
         self.routes = {
                 '/c/':{'GET':self._get_value, 'PUT':self._put_value, 'DELETE':self._delete_value},
-                '/iterator/':{'GET':self._get_iterator_value, 'DELETE':self._delete_iterator} }
+                '/iterator/':{'GET':self._get_iterator_value, 'DELETE':self._delete_iterator},
+                '/each/':{'PUT':self._put_each} }
         self.iterators = {}
 
     def render_GET(self, request):
@@ -166,6 +202,15 @@ class WebResourceAdapter(resource.Resource):
         except KeyError:
             request.setResponseCode(404)
             return 'Unknown iterator'
+
+    def _put_each(self, request, path_info):
+        code_string = request.content.getvalue()
+        driver = KeyValueIteratorDriver(self.storage, code_string)
+        driver.run()
+        request.setResponseCode(404)
+        request.write("iterator completed")
+        request.finish()
+        return server.NOT_DONE_YET
 
     def _default_action(self, request, path_info):
         request.setResponseCode(404)
