@@ -147,7 +147,9 @@ class Daemon(object):
             sys.exit(str(e))
 
         self.pidfile = cp.get(self.section, 'pidfile')
-        self.logfile = cp.get(self.section, 'logfile')
+        try:
+            self.logfile = cp.get(self.section, 'logfile')
+        except ConfigParser.NoOptionError: self.logfile = None
         self.loghost = cp.get(self.section, 'loghost')
         self.logport = cp.get(self.section, 'logport')
         self.loglevel = cp.get(self.section, 'loglevel')
