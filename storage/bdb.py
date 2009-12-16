@@ -19,7 +19,10 @@ class BTreeIterator(object):
     def close(self):
         if self.cursor: self._close_cursor()
 
-    def next(self):
+    def has_next(self):
+        return self.next is not None
+
+    def next_item(self):
         if not self.next:
             raise StopIteration
 
@@ -34,6 +37,7 @@ class BTreeIterator(object):
         return obj
 
     def _next_cursor(self):
+        if self.index >= len(self.dbs): return
         self.cursor = self.dbs[self.index].cursor()
         self.next = self.cursor.first()
         if not self.next:

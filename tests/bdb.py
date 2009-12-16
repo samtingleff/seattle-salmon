@@ -28,7 +28,8 @@ class BTreeTestCase(unittest.TestCase):
         for key in self.values.keys(): self.storage.set(key, self.values[key])
         iter = self.storage.iterator()
         found = {}
-        for key, value in iter:
+        while iter.has_next():
+            key, value = iter.next_item()
             found[key] = self.storage.get(key)
         self.assertEquals(len(self.values), len(found))
         self.assertEquals(self.values, found)

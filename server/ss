@@ -87,41 +87,45 @@ class WebResourceAdapter(resource.Resource):
     def __init__(self, storage):
         self.storage = storage
         self.routes = {
-                '/c/':{'GET':self._get_value, 'PUT':self._put_value, 'DELETE':self._delete_value}}
+                '/c/':{'GET':self._get_value, 'PUT':self._put_value, 'DELETE':self._delete_value},
+                '/iterator/':{'GET':self._get_iterator_value, 'DELETE':self._delete_iterator} }
+        self.iterators = {}
 
     def render_GET(self, request):
-        op = self._route(request.path[:3], 'GET')
-        return op(request)
+        op = self._route(request.path, 'GET')
+        return op[0](request, op[2])
 
     def render_PUT(self, request):
-        op = self._route(request.path[:3], 'PUT')
-        return op(request)
+        op = self._route(request.path, 'PUT')
+        return op[0](request, op[2])
 
     def render_DELETE(self, request):
-        op = self._route(request.path[:3], 'DELETE')
-        return op(request)
+        op = self._route(request.path, 'DELETE')
+        return op[0](request, op[2])
 
     def _route(self, path, operation):
-        try: op = self.routes[path][operation]
+        route_key = path[path.find('/'):path.find('/', 1) + 1]
+        path_info = path[path.find('/', 1) + 1:]
+        try: op = self.routes[route_key][operation]
         except KeyError: op = self._default_action
-        return op
+        return (op, route_key, path_info)
 
-    def _get_value(self, request):
-        key = request.path[3:]
+    def _get_value(self, request, path_info):
+        key = path_info
         val = self.storage.get(key)
         request.setResponseCode((200, 404)[val is None])
         request.write((val, 'Not found')[val is None])
         request.finish()
         return server.NOT_DONE_YET
 
-    def _put_value(self, request):
-        key = request.path[3:]
+    def _put_value(self, request, path_info):
+        key = path_info
         data = request.content.getvalue()
         self.storage.set(key, data)
         return 'Saved'
 
-    def _delete_value(self, request):
-        key = request.path[3:]
+    def _delete_value(self, request, path_info):
+        key = path_info
         try:
             self.storage.delete(key)
             return 'Deleted'
@@ -129,7 +133,38 @@ class WebResourceAdapter(resource.Resource):
             request.setResponseCode(404)
             return 'Not found'
 
-    def _default_action(self, request):
+    def _get_iterator_value(self, request, path_info):
+        name = path_info
+        try:
+            iter = self.iterators[name]
+        except KeyError:
+            iter = self.storage.iterator()
+            self.iterators[name] = iter
+        try:
+            if iter.has_next():
+                key, value = iter.next_item()
+                request.setResponseCode(200)
+                request.setHeader('X-iterator-key', key)
+                request.write(value)
+                request.finish()
+                return server.NOT_DONE_YET
+            else:
+                iter.close()
+                del self.iterators[name]
+                request.setResponseCode(204)
+                request.write("no content")
+                request.finish()
+                return server.NOT_DONE_YET
+        except Exception, e: raise e
+
+    def _delete_iterator(self, request, path_info):
+        name = path_info
+        try: self.iterators[name].close()
+        except KeyError:
+            request.setResponseCode(404)
+            return 'Unknown iterator'
+
+    def _default_action(self, request, path_info):
         request.setResponseCode(404)
         return 'Unknown action'
 
