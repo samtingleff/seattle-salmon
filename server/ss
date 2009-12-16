@@ -151,15 +151,20 @@ class WebResourceAdapter(resource.Resource):
             else:
                 iter.close()
                 del self.iterators[name]
-                request.setResponseCode(204)
-                request.write("no content")
+                request.setResponseCode(404)
+                request.write("iterator completed")
                 request.finish()
                 return server.NOT_DONE_YET
         except Exception, e: raise e
 
     def _delete_iterator(self, request, path_info):
         name = path_info
-        try: self.iterators[name].close()
+        try:
+            self.iterators[name].close()
+            del self.iterators[name]
+            request.setResponseCode(204)
+            request.finish()
+            return server.NOT_DONE_YET
         except KeyError:
             request.setResponseCode(404)
             return 'Unknown iterator'
