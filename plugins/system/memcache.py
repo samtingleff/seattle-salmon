@@ -19,6 +19,12 @@ class MemcachePlugin(IStoragePlugin):
     def get(self, func, key):
         val = self.mc.get(key)
         if val: return lambda k: val
+        else:
+            def get_and_fill_cache(key):
+                val = func(key)
+                if val: self.mc.set(key, val)
+                return val
+            return get_and_fill_cache
 
     def set(self, func, key, value):
         self.mc.set(key, value)
