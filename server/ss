@@ -15,6 +15,7 @@ sys.path.append(os.path.join(sys.path[0], '..'))
 from storage.bdb import BTree
 from storage.queue import QueuedStorage, QueueFullException
 from memcache import binary, constants
+from plugins.api import PluginManager
 
 from twisted.application import internet, service
 from twisted.internet import reactor, protocol, defer, task
@@ -216,6 +217,31 @@ class WebResourceAdapter(resource.Resource):
         request.setResponseCode(404)
         return 'Unknown action'
 
+class StorageWrapper(object):
+    def __init__(self, backend):
+        self.backend = backend
+
+    def get(self, key):
+        return PluginManager().execute("storage.get", self.backend.get, key)
+
+    def set(self, key, value):
+        return PluginManager().execute("storage.set", self.backend.set, key, value)
+
+    def delete(self, key):
+        return PluginManager().execute("storage.delete", self.backend.delete, key)
+
+    def iterator(self):
+        return PluginManager().execute("storage.iterator", self.backend.iterator)
+
+    def flush(self):
+        return PluginManager().execute("storage.flush", self.backend.flush)
+
+    def sync(self):
+        return PluginManager().execute("storage.sync", self.backend.sync)
+
+    def cleanup(self):
+        return PluginManager().execute("storage.cleanup", self.backend.cleanup)
+
 class SeattleSalmon(daemon.Daemon):
     default_conf = '/etc/seattle-salmon.conf'
     default_memcached_port = 8089
@@ -223,6 +249,10 @@ class SeattleSalmon(daemon.Daemon):
     section = 'daemon'
 
     def run(self):
+        # start plugin system
+        plugin_mgr = PluginManager()
+        plugin_mgr.load(self.get_option('daemon', 'plugin-file', None))
+
         factory = protocol.Factory()
         bdb = BTree(self)
 
@@ -230,6 +260,7 @@ class SeattleSalmon(daemon.Daemon):
             storage = QueuedStorage(bdb, limit=self.get_int_option('bdb', 'queue-writes-limit', default=10000))
         else: storage = bdb
 
+        storage = StorageWrapper(storage)
         MemcachedBinaryProtocol.set_storage(storage)
         factory.protocol = MemcachedBinaryProtocol
 
