@@ -8,10 +8,13 @@ class MemcachePlugin(IStoragePlugin):
         PluginManager().register("storage.set", self.set)
         PluginManager().register("storage.delete", self.delete)
         PluginManager().register("system.configure", self.configure)
+        PluginManager().register("system.start", self.start)
 
     def configure(self, func, config):
-        hosts = config.get_option('cache', 'memcached-hosts', 'localhost:11211').split(', ')
-        self.mc = memcache.Client(hosts, debug=0)
+        self.hosts = config.get_option('cache', 'memcached-hosts', 'localhost:11211').split(', ')
+
+    def start(self, func):
+        self.mc = memcache.Client(self.hosts, debug=0)
 
     def get(self, func, key):
         val = self.mc.get(key)

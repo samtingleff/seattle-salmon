@@ -292,7 +292,11 @@ class SeattleSalmon(daemon.Daemon):
             cleanup_task = task.LoopingCall(lambda: reactor.callInThread(storage.cleanup))
             cleanup_task.start(int(self.get_int_option('bdb', 'cleanup-frequency', default=60)), now=False)
 
+        plugin_mgr.execute("system.start", None)
+
         reactor.run()
+
+        plugin_mgr.execute("system.shutdown", None)
 
 if __name__ == '__main__':
     ss = SeattleSalmon()
