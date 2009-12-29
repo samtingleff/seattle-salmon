@@ -255,6 +255,7 @@ class SeattleSalmon(daemon.Daemon):
 
         plugin_mgr = PluginManager()
         plugin_mgr.load(self.get_option('daemon', 'plugin-file', None))
+        plugin_mgr.execute("system.configure", None, self)
 
         factory = protocol.Factory()
         bdb = BTree(self)
