@@ -37,7 +37,7 @@ class PluginManager(object):
     def __init__(self): pass
 
     def load(self, imports_file):
-        self.plugins = {}
+        self.callbacks = {}
         try:
             fh = open(imports_file, "r")
         except TypeError: return
@@ -48,17 +48,17 @@ class PluginManager(object):
 
     def register(self, event_name, func):
         try:
-            self.plugins[event_name].append(func)
-        except KeyError: self.plugins[event_name] = [func]
+            self.callbacks[event_name].append(func)
+        except KeyError: self.callbacks[event_name] = [func]
 
     def execute(self, event_name, func, *args, **kargs):
         fn, plugins = func, None
         try:
-            plugins = self.plugins[event_name]
+            plugins = self.callbacks[event_name]
         except KeyError: pass
         if plugins:
             for plugin in plugins:
                 result = plugin(fn, *args, **kargs)
                 if hasattr(result, '__call__'): fn = result
-        return fn(*args, **kargs)
+        if fn: return fn(*args, **kargs)
 
