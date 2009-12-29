@@ -4,7 +4,6 @@ from cache import memcache
 
 class MemcachePlugin(IStoragePlugin):
     def __init__(self):
-        print "MemcachePlugin.__init__()"
         self._connect()
         PluginManager().register("storage.get", self.get)
         PluginManager().register("storage.set", self.set)
