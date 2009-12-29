@@ -250,6 +250,9 @@ class SeattleSalmon(daemon.Daemon):
 
     def run(self):
         # start plugin system
+        plugin_dir = self.get_option('daemon', 'plugin-dir', None)
+        if plugin_dir: sys.path.append(plugin_dir)
+
         plugin_mgr = PluginManager()
         plugin_mgr.load(self.get_option('daemon', 'plugin-file', None))
 
