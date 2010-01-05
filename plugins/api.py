@@ -44,7 +44,7 @@ class PluginManager(object):
         for line in fh:
             line = line.strip()
             if line.startswith("#") or line == "": continue
-            __import__(line, globals(), locals(), [], -1)
+            __import__(line, globals(), locals(), [])
 
     def register(self, event_name, func):
         try:
