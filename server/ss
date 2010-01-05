@@ -23,7 +23,6 @@ try:
 except ImportError: pass
 from twisted.internet import reactor, protocol, defer, task
 from twisted.application import internet, service
-from twisted.python import components
 from twisted.web import resource, server
 
 class DummyStorage(object):
