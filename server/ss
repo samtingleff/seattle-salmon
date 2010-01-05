@@ -132,15 +132,18 @@ class WebResourceAdapter(resource.Resource):
 
     def render_GET(self, request):
         op = self._route(request.path, 'GET')
-        return op[0](request, op[2])
+        defer.execute(op[0], request, op[2])
+        return server.NOT_DONE_YET
 
     def render_PUT(self, request):
         op = self._route(request.path, 'PUT')
-        return op[0](request, op[2])
+        defer.execute(op[0], request, op[2])
+        return server.NOT_DONE_YET
 
     def render_DELETE(self, request):
         op = self._route(request.path, 'DELETE')
-        return op[0](request, op[2])
+        defer.execute(op[0], request, op[2])
+        return server.NOT_DONE_YET
 
     def _route(self, path, operation):
         route_key = path[path.find('/'):path.find('/', 1) + 1]
@@ -155,22 +158,25 @@ class WebResourceAdapter(resource.Resource):
         request.setResponseCode((200, 404)[val is None])
         request.write((val, 'Not found')[val is None])
         request.finish()
-        return server.NOT_DONE_YET
 
     def _put_value(self, request, path_info):
         key = path_info
         data = request.content.getvalue()
         self.storage.set(key, data)
-        return 'Saved'
+        request.setResponseCode(200)
+        request.write('Saved')
+        request.finish()
 
     def _delete_value(self, request, path_info):
         key = path_info
         try:
             self.storage.delete(key)
-            return 'Deleted'
+            request.setResponseCode(200)
+            request.write('Deleted')
         except KeyError:
             request.setResponseCode(404)
-            return 'Not found'
+            request.write('Not found')
+        request.finish()
 
     def _get_iterator_value(self, request, path_info):
         name = path_info
@@ -184,14 +190,12 @@ class WebResourceAdapter(resource.Resource):
                 key, value = iter.next_item()
                 request.redirect("/c/%s" % key)
                 request.finish()
-                return server.NOT_DONE_YET
             else:
                 iter.close()
                 del self.iterators[name]
                 request.setResponseCode(404)
                 request.write("iterator completed")
                 request.finish()
-                return server.NOT_DONE_YET
         except Exception, e: raise e
 
     def _delete_iterator(self, request, path_info):
@@ -200,11 +204,10 @@ class WebResourceAdapter(resource.Resource):
             self.iterators[name].close()
             del self.iterators[name]
             request.setResponseCode(204)
-            request.finish()
-            return server.NOT_DONE_YET
         except KeyError:
             request.setResponseCode(404)
-            return 'Unknown iterator'
+            request.write("Unknown iterator")
+        request.finish()
 
     def _put_each(self, request, path_info):
         code_string = request.content.getvalue()
@@ -213,11 +216,11 @@ class WebResourceAdapter(resource.Resource):
         request.setResponseCode(200)
         request.write("iterator completed")
         request.finish()
-        return server.NOT_DONE_YET
 
     def _default_action(self, request, path_info):
         request.setResponseCode(404)
-        return 'Unknown action'
+        request.write("Unknown action")
+        request.finish()
 
 class StorageWrapper(object):
     def __init__(self, backend):
