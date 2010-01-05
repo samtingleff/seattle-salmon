@@ -17,8 +17,12 @@ from storage.queue import QueuedStorage, QueueFullException
 from memcache import binary, constants
 from plugins.api import PluginManager
 
-from twisted.application import internet, service
+try:
+    from twisted.internet import epollreactor
+    epollreactor.install()
+except ImportError: pass
 from twisted.internet import reactor, protocol, defer, task
+from twisted.application import internet, service
 from twisted.python import components
 from twisted.web import resource, server
 
