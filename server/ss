@@ -44,24 +44,26 @@ class MemcachedBinaryProtocol(binary.BinaryServerProtocol):
     set_storage = classmethod(set_storage)
 
     def get(req, data):
-        val = MemcachedBinaryProtocol.storage.get(req.key)
-        if val: return binary.GetResponse(req,
-                MemcachedBinaryProtocol.default_flags, MemcachedBinaryProtocol.default_cas, data=val)
-        else: raise binary.MemcachedNotFound()
+        def get_deferable(req, data):
+            val = MemcachedBinaryProtocol.storage.get(req.key)
+            if val: return binary.GetResponse(req,
+                    MemcachedBinaryProtocol.default_flags, MemcachedBinaryProtocol.default_cas, data=val)
+            else: raise binary.MemcachedNotFound()
+        return defer.execute(get_deferable, req, data)
 
     def noop(req, data): return binary.Response(req)
 
     def set(req, data):
         try:
             flags, exp = struct.unpack(constants.SET_PKT_FMT, req.extra)
-            MemcachedBinaryProtocol.storage.set(req.key, data)
+            return defer.execute(MemcachedBinaryProtocol.storage.set, req.key, data)
         except Exception, e:
             print e
             raise binary.MemcachedError()
 
     def delete(req, data):
         try:
-            return MemcachedBinaryProtocol.storage.delete(req.key)
+            return defer.execute(MemcachedBinaryProtocol.storage.delete, req.key)
         except KeyError: raise binary.MemcachedNotFound()
         except Exception: raise binary.MemcachedError()
 
@@ -70,9 +72,11 @@ class MemcachedBinaryProtocol(binary.BinaryServerProtocol):
     def version(req, data):
         return binary.Response(req, data=MemcachedBinaryProtocol.version)
 
-    def flush(): return MemcachedBinaryProtocol.storage.flush()
+    def flush():
+        return defer.execute(MemcachedBinaryProtocol.storage.flush)
 
-    def sync(): return MemcachedBinaryProtocol.storage.sync()
+    def sync():
+        return defer.execute(MemcachedBinaryProtocol.storage.sync)
 
     handlers = {
         constants.CMD_GET: get,
