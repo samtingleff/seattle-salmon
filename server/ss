@@ -299,6 +299,8 @@ class SeattleSalmon(daemon.Daemon):
 
         plugin_mgr.execute("system.start", None)
 
+        reactor.suggestThreadPoolSize(self.get_int_option('daemon', 'thread-pool-size', default=10))
+
         reactor.run()
 
         plugin_mgr.execute("system.shutdown", None)
