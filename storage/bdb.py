@@ -64,15 +64,21 @@ class BTree(object):
         # "The path of a directory to be used as the location of logging files" (default tmp/logs)
         self.dbenv.set_lg_dir(daemon.get_option('bdb', 'log-dir', default='tmp/logs'))
 
-        # "Set the size of the in-memory log buffer, in bytes" (default 1M)
+        # "Set the size of the in-memory log buffer, in bytes"
         self.dbenv.set_lg_bsize(daemon.get_int_option('bdb', 'log-buffer-size', default=1024*1024))
 
-        # "Set the maximum size of a single file in the log, in bytes" (default 10M)
+        # "Set the maximum size of a single file in the log, in bytes"
         self.dbenv.set_lg_max(daemon.get_int_option('bdb', 'log-max-size', default=10*1024*1024))
 
+        # "Set the maximum number of locks supported by the Berkeley DB lock subsystem"
         self.dbenv.set_lk_max_locks(daemon.get_int_option('bdb', 'lk-max-locks', default=1000))
+
+        # "Set the maximum number of simultaneous locking entities supported by the Berkeley DB lock subsystem"
         self.dbenv.set_lk_max_lockers(daemon.get_int_option('bdb', 'lk-max-lockers', default=1000))
+
+        # Set the maximum number of simultaneously locked objects supported by the Berkeley DB lock subsystem"
         self.dbenv.set_lk_max_objects(daemon.get_int_option('bdb', 'lk-max-objects', default=1000))
+
         self.dbenv.open(self.homedir, db.DB_INIT_LOCK | db.DB_INIT_LOG | db.DB_INIT_MPOOL | db.DB_INIT_TXN | db.DB_RECOVER | db.DB_USE_ENVIRON | db.DB_USE_ENVIRON_ROOT | db.DB_CREATE | db.DB_REGISTER | db.DB_THREAD | db.DB_READ_COMMITTED | db.DB_TXN_NOWAIT | db.DB_TXN_NOSYNC)
         txn = None
         try:
