@@ -54,12 +54,22 @@ class BTree(object):
     default_flags, default_expires, default_cas = 0, 0, 0
     def __init__(self, daemon):
         self.datadir = daemon.get_option('bdb', 'data-dir', default='tmp/data')
-        self.homedir = daemon.get_option('bdb', 'log-dir', default='tmp/logs')
+        self.homedir = daemon.get_option('bdb', 'home-dir', default='tmp/home')
         self.dbs = []
         self.dbenv = db.DBEnv()
         self.dbenv.set_cachesize(
                 daemon.get_int_option('bdb', 'cache-gbytes', default=1),
                 daemon.get_int_option('bdb', 'cache-bytes', default=0))
+
+        # "The path of a directory to be used as the location of logging files" (default tmp/logs)
+        self.dbenv.set_lg_dir(daemon.get_option('bdb', 'log-dir', default='tmp/logs'))
+
+        # "Set the size of the in-memory log buffer, in bytes" (default 1M)
+        self.dbenv.set_lg_bsize(daemon.get_int_option('bdb', 'log-buffer-size', default=1024*1024))
+
+        # "Set the maximum size of a single file in the log, in bytes" (default 10M)
+        self.dbenv.set_lg_max(daemon.get_int_option('bdb', 'log-max-size', default=10*1024*1024))
+
         self.dbenv.set_lk_max_locks(daemon.get_int_option('bdb', 'lk-max-locks', default=1000))
         self.dbenv.set_lk_max_lockers(daemon.get_int_option('bdb', 'lk-max-lockers', default=1000))
         self.dbenv.set_lk_max_objects(daemon.get_int_option('bdb', 'lk-max-objects', default=1000))
