@@ -55,6 +55,7 @@ class BTree(object):
     def __init__(self, daemon):
         self.datadir = daemon.get_option('bdb', 'data-dir', default='tmp/data')
         self.homedir = daemon.get_option('bdb', 'home-dir', default='tmp/home')
+        self.logdir = daemon.get_option('bdb', 'log-dir', default='tmp/logs')
         self.dbs = []
         self.dbenv = db.DBEnv()
         self.dbenv.set_cachesize(
@@ -62,7 +63,7 @@ class BTree(object):
                 daemon.get_int_option('bdb', 'cache-bytes', default=0))
 
         # "The path of a directory to be used as the location of logging files" (default tmp/logs)
-        self.dbenv.set_lg_dir(daemon.get_option('bdb', 'log-dir', default='tmp/logs'))
+        self.dbenv.set_lg_dir(self.logdir)
 
         # "Set the size of the in-memory log buffer, in bytes"
         self.dbenv.set_lg_bsize(daemon.get_int_option('bdb', 'log-buffer-size', default=1024*1024))
@@ -186,7 +187,7 @@ class BTree(object):
         try:
             logs = self.dbenv.log_archive()
             for log in logs:
-                os.remove("%s/%s" % (self.homedir, log))
+                os.remove("%s/%s" % (self.logdir, log))
         except Exception, e:
             logging.exception(e)
 
