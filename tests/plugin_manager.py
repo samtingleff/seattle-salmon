@@ -6,14 +6,14 @@ import sys
 sys.path.append("..")
 sys.path.append(os.path.join(sys.path[0], '..'))
 
+from config import TestConfig
 from plugins.api import IStoragePlugin, PluginManager
 
 class TestPlugin(IStoragePlugin):
     def __init__(self):
         mgr = PluginManager()
+        mgr.load(TestConfig().get_option('daemon', 'plugin-file', None))
         mgr.register("test_event", self.plugin_function)
-
-    def name(self): return "test_plugin"
 
     def plugin_function(self, fn, *args, **kargs):
         self.plugin_function_called = 1
