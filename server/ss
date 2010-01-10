@@ -224,6 +224,10 @@ class SeattleSalmon(daemon.Daemon):
     section = 'daemon'
 
     def run(self):
+
+        # suggest a thread pool size
+        reactor.suggestThreadPoolSize(self.get_int_option('daemon', 'thread-pool-size', default=10))
+
         # start plugin system
         plugin_dir = self.get_option('daemon', 'plugin-dir', None)
         if plugin_dir: sys.path.append(plugin_dir)
@@ -268,8 +272,6 @@ class SeattleSalmon(daemon.Daemon):
             cleanup_task.start(int(self.get_int_option('bdb', 'cleanup-frequency', default=60)), now=False)
 
         plugin_mgr.execute("system.start", None)
-
-        reactor.suggestThreadPoolSize(self.get_int_option('daemon', 'thread-pool-size', default=10))
 
         reactor.run()
 
