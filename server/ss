@@ -129,7 +129,7 @@ class WebResourceAdapter(resource.Resource):
         self.storage = storage
         self.routes = {
                 '/c/':{'GET':self._get_value, 'PUT':self._put_value, 'DELETE':self._delete_value},
-                '/each/':{'PUT':self._put_each} }
+                '/iterator/':{'PUT':self._put_each} }
 
     def render_GET(self, request):
         op = self._route(request.path, 'GET')
