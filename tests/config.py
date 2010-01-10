@@ -3,6 +3,7 @@ class TestConfig(object):
     configs = {
         'bdb':{
             'data-dir':'/home/sam/src/seattle-salmon/tmp/data',
+            'home-dir':'/home/sam/src/seattle-salmon/tmp/home',
             'log-dir':'/home/sam/src/seattle-salmon/tmp/logs',
             'splits':8}
     }

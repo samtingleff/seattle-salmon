@@ -129,9 +129,7 @@ class WebResourceAdapter(resource.Resource):
         self.storage = storage
         self.routes = {
                 '/c/':{'GET':self._get_value, 'PUT':self._put_value, 'DELETE':self._delete_value},
-                '/iterator/':{'GET':self._get_iterator_value, 'DELETE':self._delete_iterator},
                 '/each/':{'PUT':self._put_each} }
-        self.iterators = {}
 
     def render_GET(self, request):
         op = self._route(request.path, 'GET')
@@ -179,37 +177,6 @@ class WebResourceAdapter(resource.Resource):
         except KeyError:
             request.setResponseCode(404)
             request.write('Not found')
-        request.finish()
-
-    def _get_iterator_value(self, request, path_info):
-        name = path_info
-        try:
-            iter = self.iterators[name]
-        except KeyError:
-            iter = self.storage.iterator()
-            self.iterators[name] = iter
-        try:
-            if iter.has_next():
-                key, value = iter.next_item()
-                request.redirect("/c/%s" % key)
-                request.finish()
-            else:
-                iter.close()
-                del self.iterators[name]
-                request.setResponseCode(404)
-                request.write("iterator completed")
-                request.finish()
-        except Exception, e: raise e
-
-    def _delete_iterator(self, request, path_info):
-        name = path_info
-        try:
-            self.iterators[name].close()
-            del self.iterators[name]
-            request.setResponseCode(204)
-        except KeyError:
-            request.setResponseCode(404)
-            request.write("Unknown iterator")
         request.finish()
 
     def _put_each(self, request, path_info):
