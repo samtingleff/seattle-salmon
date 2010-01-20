@@ -40,7 +40,7 @@ class DummyStorage(object):
 class MemcachedBinaryProtocol(binary.BinaryServerProtocol):
     storage = DummyStorage()
     default_flags, default_expires, default_cas = 0, 0, 0
-    version = "0.0.1"
+    version_string = "0.0.1"
 
     def set_storage(cls, storage_impl):
         MemcachedBinaryProtocol.storage = storage_impl
@@ -73,7 +73,7 @@ class MemcachedBinaryProtocol(binary.BinaryServerProtocol):
     def quit(*a): raise binary.MemcachedDisconnect()
 
     def version(req, data):
-        return binary.Response(req, data=MemcachedBinaryProtocol.version)
+        return binary.Response(req, data=MemcachedBinaryProtocol.version_string)
 
     def flush():
         return defer.execute(MemcachedBinaryProtocol.storage.flush)
